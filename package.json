@@ -1,0 +1,47 @@
+{
+  "name": "template",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "node -e \"console.error('Run a scoped test: pnpm test:unit, test:scripts, test:integration, or test:e2e.');process.exit(1)\"",
+    "test:unit": "node scripts/test/run-tests.mjs unit --passWithNoTests",
+    "test:scripts": "node scripts/test/run-tests.mjs scripts",
+    "test:coverage": "vitest run --project unit --coverage --passWithNoTests",
+    "test:layout": "node scripts/test/check-test-layout.mjs",
+    "test:e2e": "pnpm --filter @nodeint/e2e test",
+    "test:integration": "node scripts/test/run-tests.mjs integration --passWithNoTests",
+    "setup:git": "node scripts/git/setup-git.mjs",
+    "lint": "node scripts/lint/run-eslint.mjs --max-warnings 0",
+    "lint:fix": "node scripts/lint/run-eslint.mjs --max-warnings 0 --fix",
+    "lint:md": "node scripts/lint/lint-md.mjs",
+    "lint:md:fix": "node scripts/lint/lint-md.mjs --fix",
+    "lint:md:links": "node scripts/lint/lint-md-links.mjs",
+    "lint:docs": "node scripts/docs/catalog.mjs --check",
+    "docs:generate": "node scripts/docs/catalog.mjs",
+    "knip": "knip --no-progress",
+    "jscpd": "jscpd",
+    "init:template": "node scripts/init.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "catalog:",
+    "eslint": "^10.13.0",
+    "eslint-plugin-only-warn": "^1.2.1",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
+    "eslint-plugin-sonarjs": "^4.2.2",
+    "eslint-plugin-unicorn": "^77.0.0",
+    "globals": "^17.13.0",
+    "jscpd": "5.4.3",
+    "knip": "^6.45.1",
+    "markdownlint-cli2": "^0.24.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "catalog:"
+  }
+}

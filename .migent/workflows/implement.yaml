@@ -1,0 +1,40 @@
+schema_version: 7
+id: implement
+
+artifacts:
+  implement_summary:
+    file: implement_summary.md
+    description: Changes made, files touched, checks run with results, deviations from the plan, anything unverified, and References to inputs needed for the pull request.
+
+stages:
+  - id: implement
+    role: developer
+    max_revisions: 3
+    ask: human
+    instructions:
+      - Load the implement skill, plus the typescript, eslint, and testing skills when the work creates or changes `.ts`/`.tsx` files or tests, and the writing skill when it creates or changes Markdown.
+      - Implement the task; write implement_summary.md.
+      - If the prior handoff rules out direct implementation, ask the human how to proceed.
+      - With a plan, implement its phases in order and report each outcome.
+    artifacts: [implement_summary]
+    verify:
+      - pnpm build
+
+  - id: review_work
+    role: reviewer
+    depends_on:
+      - implement
+    instructions:
+      - Load the review and implement skills, plus the typescript, eslint, and testing skills when the work creates or changes `.ts`/`.tsx` files or tests, and the writing skill when the work creates or changes Markdown.
+      - Review the work against the task and implement_summary.md.
+    decision:
+      - approved:
+          when: The change meets the task, and the design and plan when provided, has no required fixes, and verification evidence passes.
+          navigate: complete
+      - revise:
+          when: Required fixes remain, or verification evidence is missing or failing.
+          navigate: implement
+
+downstream:
+  - workflow: pr
+    task: Open a pull request for the implemented change.

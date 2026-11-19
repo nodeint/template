@@ -1,0 +1,192 @@
+name: Release
+
+# A squashed release PR ("Release X.Y.Z (#N)") landing on next releases that
+# version. The github job tags the commit, fast-forwards main to it, and
+# creates the GitHub Release. The npm job then publishes from the tag.
+# Every other push to next is ignored.
+#
+# workflow_dispatch reruns only the npm job for an existing vX.Y.Z tag. Use it
+# after a failed publish, for example once a new package has been published by
+# hand and given its trusted publisher.
+on:
+  push:
+    branches:
+      - next
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish from its existing vX.Y.Z tag
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
+      ref: ${{ steps.plan.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect release
+        id: plan
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            version="${INPUT_VERSION#v}"
+            if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::version must be X.Y.Z, got: $INPUT_VERSION"
+              exit 1
+            fi
+            tag="v$version"
+            git fetch origin tag "$tag" --no-tags 2>/dev/null || true
+            if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "::error::$tag does not exist; only the push flow creates release tags"
+              exit 1
+            fi
+            git checkout -q "$tag"
+            ref="refs/tags/$tag"
+          else
+            subject=$(git log -1 --format=%s "$GITHUB_SHA")
+            if ! [[ "$subject" =~ ^Release\ ([0-9]+\.[0-9]+\.[0-9]+)\ \(#[0-9]+\)$ ]]; then
+              echo "Not a release commit: $subject"
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            version="${BASH_REMATCH[1]}"
+            ref="$GITHUB_SHA"
+          fi
+          for manifest in packages/*/package.json; do
+            actual=$(node -p "require('./$manifest').version")
+            if [ "$actual" != "$version" ]; then
+              echo "::error file=$manifest::version $actual does not match release $version"
+              exit 1
+            fi
+          done
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+  github:
+    needs: plan
+    if: github.event_name == 'push' && needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Extract release notes
+        run: |
+          version="${{ needs.plan.outputs.version }}"
+          awk -v v="$version" '$0 == "## " v {f=1; next} /^## /{f=0} f' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "::error file=CHANGELOG.md::no notes under ## $version"
+            exit 1
+          fi
+
+      # Reruns are safe: an existing tag on this commit and an up-to-date main
+      # are accepted.
+      - name: Tag the release commit
+        run: |
+          tag="v${{ needs.plan.outputs.version }}"
+          git fetch origin tag "$tag" --no-tags 2>/dev/null || true
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            if [ "$(git rev-parse "$tag^{commit}")" != "$GITHUB_SHA" ]; then
+              echo "::error::$tag already exists on a different commit; never move a release tag"
+              exit 1
+            fi
+          else
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "refs/tags/$tag:refs/tags/$tag"
+          fi
+
+      - name: Fast-forward main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor origin/main "$GITHUB_SHA"; then
+            echo "::error::main is not an ancestor of $GITHUB_SHA; resolve the history before releasing"
+            exit 1
+          fi
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            git push origin "$GITHUB_SHA:refs/heads/main"
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ needs.plan.outputs.version }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists"
+          else
+            gh release create "$tag" --verify-tag \
+              --title "${tag#v}" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+
+  # Trusted publishing is bound to this file name: renaming release.yml breaks
+  # npm publish until every package's trusted publisher is updated.
+  npm:
+    needs: [plan, github]
+    if: >-
+      always() && needs.plan.outputs.release == 'true' &&
+      (needs.github.result == 'success' ||
+       (github.event_name == 'workflow_dispatch' && needs.github.result == 'skipped'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm >= 11.5.1.
+      - name: Install npm
+        run: npm install -g npm@12.2.0
+
+      - name: Install, build
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      # pnpm pack rewrites workspace:* to exact versions.
+      - name: Pack
+        run: pnpm --filter "./packages/*" pack --pack-destination "$RUNNER_TEMP/release"
+
+      # Dependency order, so a failure never leaves the CLI pointing at a
+      # missing dependency. Versions that are already public are skipped.
+      - name: Publish to npm
+        run: |
+          cd "$RUNNER_TEMP/release"
+          version="${{ needs.plan.outputs.version }}"
+          for tarball in ./*.tgz; do
+            name=$(tar -xOf "$tarball" package/package.json | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).name')
+            if npm view "$name@$version" version --prefer-online >/dev/null 2>&1; then
+              echo "$name@$version is already public"
+            else
+              npm publish "$tarball" --access public
+            fi
+          done

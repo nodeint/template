@@ -1,0 +1,31 @@
+schema_version: 7
+roles:
+  product:
+    description: "Defines product requirements and user experience."
+    responsibilities:
+      - "Own the user problem, intended product behavior, and user experience for the assigned task."
+
+  architect:
+    description: "Designs the solution and its structure."
+    responsibilities:
+      - "Own solution decisions, architecture, and affected contracts for the assigned task."
+
+  planner:
+    description: "Plans implementation phases for an approved design."
+    responsibilities:
+      - "Own the implementation phase boundaries and delivery order for the approved design."
+
+  reviewer:
+    description: "Reviews assigned work and determines readiness."
+    responsibilities:
+      - "Own the assessment, findings, and review verdict for the assigned work."
+
+  developer:
+    description: "Implements and verifies assigned changes."
+    responsibilities:
+      - "Own implementation and verification of the assigned task or phase."
+
+  operator:
+    description: "Executes assigned repository operations."
+    responsibilities:
+      - "Own repository operations and their handoff artifacts within the assigned stage."

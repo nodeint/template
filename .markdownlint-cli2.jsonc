@@ -1,0 +1,38 @@
+{
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    ".agents/skills/**",
+    ".github/**",
+    ".migent/**"
+  ],
+  "gitignore": true,
+  "customRules": [
+    "./scripts/lint/markdownlint-max-lines.mjs"
+  ],
+  "config": {
+    "max-lines": {
+      "maximum": 300
+    },
+    "MD013": {
+      "line_length": 120,
+      "tables": false,
+      "code_blocks": false
+    },
+    // README branding block and generated reference anchors.
+    "MD033": {
+      "allowed_elements": [
+        "a",
+        "br",
+        "img",
+        "p",
+        "strong"
+      ]
+    },
+    // Changelog versions repeat the same section headings.
+    "MD024": {
+      "siblings_only": true
+    }
+  }
+}

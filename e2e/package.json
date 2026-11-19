@@ -1,0 +1,15 @@
+{
+  "name": "@nodeint/e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end tests that use built packages as a consumer would.",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nodeint/example": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}

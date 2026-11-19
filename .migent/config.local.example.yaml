@@ -1,0 +1,38 @@
+# Your agents. Copy this file to config.local.yaml (it is not committed), then set a model for each role.
+#
+# List the models and efforts installed on your machine:
+#   migent get models
+#   migent get efforts
+# Check the result with: migent doctor
+schema_version: 7
+
+roles:
+  product:
+    agent:
+      model: opus
+      effort: medium
+
+  architect:
+    agent:
+      model: opus
+      effort: medium
+
+  planner:
+    agent:
+      model: opus
+      effort: medium
+
+  reviewer:
+    agent:
+      model: gpt-6.1-sol
+      effort: medium
+
+  developer:
+    agent:
+      model: sonnet
+      effort: medium
+
+  operator:
+    agent:
+      model: sonnet
+      effort: low

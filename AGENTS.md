@@ -1,0 +1,69 @@
+# Agent Instructions
+
+## Working principles
+
+### Scope and evidence
+
+1. Define the goal, scope, constraints, acceptance criteria, and verification method before planning or implementation.
+2. If the request, scope, or goal is unclear, stop and ask the user instead of choosing an interpretation independently.
+3. Review the proposed approach against repository evidence;
+   surface material weaknesses, assumptions, risks, and trade-offs before proceeding.
+
+### Implementation discipline
+
+1. Address the root cause with the smallest change that satisfies the acceptance criteria, and avoid opportunistic work.
+2. Follow established architecture, ownership, and patterns;
+   use an ad hoc workaround only when no better structural option remains and the user approves the trade-off.
+3. Preserve unrelated work and user changes, and do not reformat, revert, or overwrite files outside the task scope.
+4. Do not create, remove, weaken, or bypass repository rules without the user's explicit approval.
+
+### Blocking and safety
+
+1. When blocked, report the blocker and ask the user how to proceed;
+   do not bypass, reinterpret, or work around it independently.
+2. Obtain explicit user approval before destructive, irreversible, or externally visible actions.
+3. Protect secrets and sensitive data, and access or expose only what the authorized task requires.
+
+### Verification and handoff
+
+1. After implementation, test the changed behavior and run the checks relevant to the actual change scope.
+2. Never delete, skip, weaken, or rewrite verification merely to make the implementation pass.
+3. Report the changes, commands run, results, unresolved risks, and anything not verified without overstating completion.
+4. Do not report a check as passing when its command failed, was not run, or covered none of the requested files.
+
+## Skills
+
+Skills own task-specific procedures, references, and verification rules.
+Before acting, load every skill whose trigger matches the request or intended changes;
+a task may require more than one skill.
+Read each selected `SKILL.md` completely and follow any narrower references it routes to.
+Do not load a skill only because its subject appears incidentally in context.
+Explicit user instructions take precedence over skill guidance.
+
+| Skill | Load when |
+| :--- | :--- |
+| [`writing`](.agents/skills/writing/SKILL.md) | Creating, changing, splitting, merging, or reviewing Markdown content or file structure |
+| [`docs`](.agents/skills/docs/SKILL.md) | Adding, moving, removing, or reviewing a document under `docs/` or its catalog |
+| [`eslint`](.agents/skills/eslint/SKILL.md) | Creating or changing `.ts` or `.tsx`, reviewing those files against repository lint rules, or validating ESLint |
+| [`testing`](.agents/skills/testing/SKILL.md) | Writing, changing, reviewing, or deleting tests, or deciding what a test should cover |
+| [`typescript`](.agents/skills/typescript/SKILL.md) | Creating, changing, or reviewing `.ts` or `.tsx` files against TypeScript coding standards |
+| [`create-issue`](.agents/skills/create-issue/SKILL.md) | Creating or rewriting a repository GitHub issue |
+| [`checkout-issue`](.agents/skills/checkout-issue/SKILL.md) | Reading or starting work on a repository GitHub issue |
+| [`product`](.agents/skills/product/SKILL.md) | Defining product requirements, user scenarios, CLI UX, and acceptance criteria before design |
+| [`design`](.agents/skills/design/SKILL.md) | Deciding the solution and its structure for a triaged task before planning or implementing |
+| [`planning`](.agents/skills/planning/SKILL.md) | Splitting requirements and design decisions into independently verifiable phases |
+| [`implement`](.agents/skills/implement/SKILL.md) | Implementing a task or selected plan phase |
+| [`review`](.agents/skills/review/SKILL.md) | Reviewing work against task requirements, workflow rules, and applicable skills |
+| [`create-pr`](.agents/skills/create-pr/SKILL.md) | Committing, pushing, and opening a pull request into `next` |
+| [`release`](.agents/skills/release/SKILL.md) | Preparing or publishing a package release and synchronizing `main` |
+
+## Repository rules and documentation
+
+Read these before acting, in this order:
+
+1. [CONTRIBUTING.md](CONTRIBUTING.md): rules for every change, including setup, tests, branches, and pull requests.
+2. The [documentation load map](docs/README.md#documents): pick the documents for the task.
+   Follow every matching route when the task touches more than one area.
+3. The `README.md` of each package you will change: its rules and key symbols.
+
+Read only what the task needs. A narrower rule in a package README or skill takes precedence over a general one.
