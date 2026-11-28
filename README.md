@@ -22,12 +22,28 @@ the repository's rules, tooling, and workflows keep that work correct, reviewabl
 ## Set up
 
 1. Click **Use this template** on GitHub.
-2. Run `node scripts/init.mjs <repo-name> [--scope @nodeint]` to rename the template references.
-3. Run `pnpm install && pnpm setup:git`.
-4. Import `.github/main-ruleset.json` and `.github/next-ruleset.json` in the repository settings;
+2. Run `node scripts/init.mjs` (or `pnpm init:template`) in a terminal. It prompts for the repository name and
+   npm scope, shows the files it will rewrite, asks for confirmation, then rewrites the template references and
+   runs `pnpm install` and `pnpm setup:git`.
+3. Import `.github/main-ruleset.json` and `.github/next-ruleset.json` in the repository settings;
    GitHub does not copy rulesets from a template.
-5. Replace `packages/example`; update `docs/` and `AGENTS.md`.
-6. [Set up Migent](#set-up-migent).
+4. Replace `packages/example`; update `docs/` and `AGENTS.md`.
+5. [Set up Migent](#set-up-migent).
+
+Agents and CI pass flags instead of answering prompts:
+
+```sh
+node scripts/init.mjs <repo-name> [--scope <scope>] [--yes] [--skip-install]
+```
+
+| Flag | Meaning |
+| :--- | :--- |
+| `<repo-name>` | Lowercase letters, digits, and hyphens, starting with a letter; prompted in a terminal, required without one |
+| `--scope <scope>` | npm scope such as `@acme`; defaults to `@nodeint` |
+| `--yes` | Skip the confirmation prompt; required without a terminal |
+| `--skip-install` | Rewrite references only; run `pnpm install && pnpm setup:git` yourself |
+
+Exit code 0 means done, 1 means cancelled or a step failed, and 2 means a usage error.
 
 ### Set up Migent
 
