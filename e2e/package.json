@@ -1,5 +1,5 @@
 {
-  "name": "@nodeint/e2e",
+  "name": "@scope/e2e",
   "private": true,
   "type": "module",
   "description": "End-to-end tests that use built packages as a consumer would.",
@@ -7,7 +7,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@nodeint/example": "workspace:*"
+    "@scope/example": "workspace:*"
   },
   "devDependencies": {
     "vitest": "catalog:"

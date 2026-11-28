@@ -1,6 +1,9 @@
 # Contributing
 
-Repository: `nodeint/template`. Run `node scripts/init.mjs <repo-name>` once after creating a repo from it.
+Repository: `<owner>/<repo>`. Run `node scripts/init.mjs` once after creating a repo from it;
+it renames the template, runs `pnpm install` and `pnpm setup:git`, and lists the remaining manual steps. Agents and CI run
+`node scripts/init.mjs <repo-name> [--scope <scope>] --yes`; add `--skip-install` to rewrite only
+(see [README](README.md#set-up)).
 
 ## Setup
 
@@ -14,7 +17,7 @@ pnpm build
 
 ## Packages
 
-Paths are `packages/<name>`; names are `@nodeint/<name>`.
+Paths are `packages/<name>`; names are `@scope/<name>`.
 
 | Name | Owns |
 | --- | --- |

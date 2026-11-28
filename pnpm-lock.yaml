@@ -229,7 +229,7 @@ importers:
 
   e2e:
     dependencies:
-      '@nodeint/example':
+      '@scope/example':
         specifier: workspace:*
         version: link:../packages/example
     devDependencies:

@@ -27,10 +27,6 @@ packages/<name>/
   tsdown.config.ts
   src/
     index.ts
-    constants.ts
-    types.ts
-    utils/
-      index.ts
 ```
 
 | Path | Responsibility | Exports |

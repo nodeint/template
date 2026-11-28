@@ -1,4 +1,4 @@
-# @nodeint/e2e
+# @scope/e2e
 
 Private package of end-to-end tests. It is never published and has no version.
 

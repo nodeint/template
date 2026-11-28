@@ -1,4 +1,4 @@
-schema_version: 7
+schema_version: 8
 id: product
 constraints:
   - Product specification only. Do not modify source code or design internal software architecture.
@@ -15,7 +15,7 @@ artifacts:
 
 stages:
   - id: product
-    role: product
+    role: product_analyst
     max_revisions: 3
     ask: human
     instructions:
@@ -28,7 +28,7 @@ stages:
     artifacts: [prd]
 
   - id: review_product
-    role: reviewer
+    role: product_reviewer
     depends_on:
       - product
     instructions:

@@ -1,4 +1,4 @@
-schema_version: 7
+schema_version: 8
 id: design
 constraints:
   - Design only. Do not modify source code.
@@ -28,7 +28,7 @@ stages:
     artifacts: [design]
 
   - id: review_design
-    role: reviewer
+    role: architect_reviewer
     depends_on:
       - design
     instructions:

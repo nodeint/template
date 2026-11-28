@@ -1,5 +1,5 @@
 {
-  "name": "template",
+  "name": "<package>",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.6.0",
@@ -13,7 +13,7 @@
     "test:scripts": "node scripts/test/run-tests.mjs scripts",
     "test:coverage": "vitest run --project unit --coverage --passWithNoTests",
     "test:layout": "node scripts/test/check-test-layout.mjs",
-    "test:e2e": "pnpm --filter @nodeint/e2e test",
+    "test:e2e": "pnpm --filter @scope/e2e test",
     "test:integration": "node scripts/test/run-tests.mjs integration --passWithNoTests",
     "setup:git": "node scripts/git/setup-git.mjs",
     "lint": "node scripts/lint/run-eslint.mjs --max-warnings 0",

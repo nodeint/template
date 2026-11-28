@@ -4,10 +4,15 @@
 #   migent get models
 #   migent get efforts
 # Check the result with: migent doctor
-schema_version: 7
+schema_version: 8
 
 roles:
-  product:
+  product_analyst:
+    agent:
+      model: gpt-6.2-sol
+      effort: medium
+
+  product_reviewer:
     agent:
       model: opus
       effort: medium
@@ -17,7 +22,17 @@ roles:
       model: opus
       effort: medium
 
+  architect_reviewer:
+    agent:
+      model: gpt-6.2-sol
+      effort: medium
+
   planner:
+    agent:
+      model: gpt-6.2-sol
+      effort: medium
+
+  planner_reviewer:
     agent:
       model: opus
       effort: medium
