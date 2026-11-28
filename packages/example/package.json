@@ -1,11 +1,11 @@
 {
-  "name": "@nodeint/example",
+  "name": "@scope/example",
   "version": "0.0.0",
   "description": "Example package; rename or replace it.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nodeint/template.git",
+    "url": "git+https://github.com/<owner>/<repo>.git",
     "directory": "packages/example"
   },
   "type": "module",

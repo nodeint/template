@@ -1,4 +1,4 @@
-# @nodeint/example
+# @scope/example
 
 Generic library scaffold. Copy it using the [package guide](../../docs/guides/add-package.md), then rename it.
 

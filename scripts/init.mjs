@@ -3,8 +3,9 @@
  *
  * Usage: node scripts/init.mjs [<repo-name>] [--scope <scope>] [--yes] [--skip-install]
  *
- * Rewrites `template`/`@nodeint/example` references in tracked text files and package manifests,
- * then runs `pnpm install` and `pnpm setup:git`. In a terminal it prompts for missing values and
+ * Replaces the `<package>`, `@scope`, `<owner>`, and `<repo>` placeholders in tracked text files and package manifests.
+ * When `origin` is a GitHub remote, its owner and repository name are the defaults for owner, name, and scope.
+ * Then runs `pnpm install` and `pnpm setup:git`. In a terminal it prompts for missing values and
  * asks for confirmation; without a terminal it needs `<repo-name>` and `--yes`.
  * Uses Node built-ins only, because it runs before `pnpm install`.
  *
@@ -17,10 +18,17 @@ import { createInterface } from 'node:readline';
 import { REPO_ROOT } from './lib/repo.mjs';
 
 const USAGE = 'usage: node scripts/init.mjs [<repo-name>] [--scope <scope>] [--yes] [--skip-install]';
-const DEFAULT_SCOPE = '@nodeint';
 const NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
+// An owner or repository name as GitHub allows it: letters, digits, `-`, `_`, and `.`.
+const REMOTE_PART = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// Paths whose text uses `<owner>` and `<package>` as generic examples, not template placeholders.
+// GitHub remote forms: https://[user@]github.com/o/r[.git], ssh://git@github.com[:port]/o/r, git@github.com:o/r.
+const REMOTE_URL = /^(?:https?:\/\/(?:[^@/\s]+@)?|ssh:\/\/git@|git@)github\.com(?::\d+)?[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i;
+const EXCLUDED_PREFIXES = ['.agents/', '.migent/', 'CHANGELOG.md'];
 const SCOPE_PATTERN = /^@[a-z0-9][a-z0-9._-]*$/;
-const PNPM_STEPS = [['install'], ['setup:git']];
+// Prompt default for the repository name when `origin` gives none.
+const DEFAULT_NAME = 'my-project';
+const PNPM_STEPS =[['install'], ['setup:git']];
 
 /** Write synchronously so output stays ordered with child process output. */
 const out = (text) => writeSync(1, `${text}\n`);
@@ -36,6 +44,14 @@ function nameProblem(name) {
   return NAME_PATTERN.test(name)
     ? undefined
     : `Invalid name "${name}": use lowercase letters, digits, and hyphens, starting with a letter.`;
+}
+
+/** Derives a valid package name from a repository name (`Cool.Repo` becomes `cool-repo`); undefined when none fits. */
+function packageNameFrom(repo) {
+  const slug = repo.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  // Names must start with a letter, so a leading digit gets a `pkg-` prefix (`3d-tools` becomes `pkg-3d-tools`).
+  const name = /^[0-9]/.test(slug) ? `pkg-${slug}` : slug;
+  return nameProblem(name) ? undefined : name;
 }
 
 /** Returns a reason when the scope is invalid, otherwise undefined. */
@@ -69,12 +85,29 @@ function parseArgs(argv) {
 }
 
 /** Applies the template replacements to one file's content. */
-function rewrite(content, name, scope) {
+function rewrite(content, { name, scope, owner, repo }) {
   return content
-    .replaceAll('nodeint/template', `nodeint/${name}`)
-    .replaceAll('"name": "template"', `"name": "${name}"`)
-    .replaceAll('@nodeint/<name>', `${scope}/<name>`)
-    .replaceAll('@nodeint/example', `${scope}/example`);
+    .replaceAll('<owner>', owner)
+    .replaceAll('<repo>', repo)
+    .replaceAll('<package>', name)
+    .replaceAll('@scope', scope);
+}
+
+/** Reads owner and repository name from a GitHub `origin` remote, keeping their case; returns `{}` when there is none. */
+function detectRemote() {
+  let url;
+  try {
+    url = execFileSync('git', ['remote', 'get-url', 'origin'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return {};
+  }
+  const match = REMOTE_URL.exec(url);
+  if (!match || !REMOTE_PART.test(match[1]) || !REMOTE_PART.test(match[2])) return {};
+  return { owner: match[1], repo: match[2] };
 }
 
 function usageError(message) {
@@ -122,11 +155,11 @@ function listCandidates() {
   }
   return listing
     .split(/\r?\n/)
-    .filter((file) => /\.(json|md|ya?ml|mjs|ts)$/.test(file) && file !== 'pnpm-lock.yaml' && file !== 'scripts/init.mjs');
+    .filter((file) => /\.(json|md|ya?ml|mjs|ts)$/.test(file) && !file.startsWith('scripts/init') && !EXCLUDED_PREFIXES.some((prefix) => file.startsWith(prefix)));
 }
 
 /** Reads every candidate and returns the changes to apply; exits 1 when a file cannot be read. */
-function planChanges(files, name, scope) {
+function planChanges(files, values) {
   const changes = [];
   for (const file of files) {
     let before;
@@ -136,17 +169,18 @@ function planChanges(files, name, scope) {
       err(`Cannot read ${file}: ${error.message}`);
       process.exit(1);
     }
-    const after = rewrite(before, name, scope);
+    const after = rewrite(before, values);
     if (after !== before) changes.push({ file, before, after });
   }
   return changes;
 }
 
-function printSummary(name, scope, changes, skipInstall) {
+function printSummary({ name, scope, owner, repo }, changes, skipInstall) {
   const commands = skipInstall ? 'none (--skip-install)' : PNPM_STEPS.map((s) => `pnpm ${s[0]}`).join(', ');
   out('Template init summary');
   out(`  Repository name: ${name}`);
   out(`  npm scope:       ${scope}`);
+  out(`  GitHub repo:     ${owner}/${repo}`);
   out(changes.length === 0 ? '  Files to rewrite (0): none' : `  Files to rewrite (${changes.length}):`);
   for (const { file } of changes) out(`    ${file}`);
   out(`  Commands to run: ${commands}`);
@@ -221,8 +255,9 @@ function runPnpm() {
   }
 }
 
-function printCompletion(name, scope, skipInstall) {
+function printCompletion({ name, scope }, skipInstall) {
   const steps = [
+    'Delete scripts/init.mjs and scripts/init.integration.test.mjs, and remove "init:template" from package.json.',
     'Import .github/main-ruleset.json and .github/next-ruleset.json in the repository settings.',
     'Replace packages/example; update docs/ and AGENTS.md.',
     'Set up Migent: see README.md#set-up-migent.',
@@ -239,32 +274,41 @@ async function main() {
   const { options } = parsed;
   const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
 
-  if (!interactive && options.name === undefined) usageError('Missing repository name.');
-
   const rl = interactive ? createInterface({ input: process.stdin, output: process.stdout }) : undefined;
   rl?.on('close', () => closed.add(rl));
   rl?.on('SIGINT', () => rl.close());
 
   try {
-    const name = options.name ?? (await promptValue(rl, 'Repository name', nameProblem));
-    const scope = options.scope ?? (interactive ? await promptValue(rl, 'npm scope', scopeProblem, DEFAULT_SCOPE) : DEFAULT_SCOPE);
+    const remote = detectRemote();
+    const defaultName = remote.repo ? packageNameFrom(remote.repo) : undefined;
+    const name =
+      options.name ??
+      (interactive ? await promptValue(rl, 'Repository name', nameProblem, defaultName ?? DEFAULT_NAME) : defaultName);
+    if (name === undefined) usageError('Missing repository name: pass <repo-name> or add a GitHub origin remote.');
+    const remoteScope = remote.owner && !scopeProblem(`@${remote.owner.toLowerCase()}`) ? `@${remote.owner.toLowerCase()}` : undefined;
+    const scope =
+      options.scope ??
+      (interactive ? await promptValue(rl, 'npm scope', scopeProblem, remoteScope ?? `@${name}`) : remoteScope);
+    if (scope === undefined) usageError('Missing npm scope: pass --scope or add a GitHub origin remote.');
+    // The repository identity comes from `origin` when present; the package name and scope never change it.
+    const values = { name, scope, owner: remote.owner ?? scope.slice(1), repo: remote.repo ?? name };
 
-    const changes = planChanges(listCandidates(), name, scope);
-    printSummary(name, scope, changes, options.skipInstall);
+    const changes = planChanges(listCandidates(), values);
+    printSummary(values, changes, options.skipInstall);
 
     if (!options.yes) {
       if (!interactive) {
         err('Confirmation required: re-run with --yes to apply these changes.');
         process.exit(2);
       }
-      const answer = (await ask(rl, 'Proceed? [y/N] ')).toLowerCase();
-      if (answer !== 'y' && answer !== 'yes') throw new Cancelled();
+      const answer = (await ask(rl, 'Proceed? [Y/n] ')).toLowerCase();
+      if (answer !== '' && answer !== 'y' && answer !== 'yes') throw new Cancelled();
     }
     rl?.close();
 
     applyChanges(changes);
     if (!options.skipInstall) runPnpm();
-    printCompletion(name, scope, options.skipInstall);
+    printCompletion(values, options.skipInstall);
   } catch (error) {
     if (!(error instanceof Cancelled)) throw error;
     out('Cancelled. No files were changed.');
