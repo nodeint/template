@@ -14,6 +14,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+import { styleText } from 'node:util';
 
 import { REPO_ROOT } from './lib/repo.mjs';
 
@@ -33,6 +34,11 @@ const PNPM_STEPS =[['install'], ['setup:git']];
 /** Write synchronously so output stays ordered with child process output. */
 const out = (text) => writeSync(1, `${text}\n`);
 const err = (text) => writeSync(2, `${text}\n`);
+/** Styles text for a stream; stays plain when the stream is not a color terminal or NO_COLOR is set. */
+const paint = (format, text, stream = process.stdout) => styleText(format, text, { stream });
+const errPaint = (format, text) => paint(format, text, process.stderr);
+/** Prints a section heading preceded by a blank line. */
+const heading = (text) => out(`\n${paint(['bold', 'cyan'], text)}`);
 
 class Cancelled extends Error {}
 
@@ -132,10 +138,10 @@ function ask(rl, question) {
 /** Prompts until the answer passes `check`; an empty answer uses `fallback` when given. */
 async function promptValue(rl, label, check, fallback) {
   for (;;) {
-    const answer = (await ask(rl, fallback ? `${label} [${fallback}]: ` : `${label}: `)) || fallback || '';
+    const answer = (await ask(rl, `${paint('bold', label)}${fallback ? paint('dim', ` [${fallback}]`) : ''}: `)) || fallback || '';
     const problem = check(answer);
     if (!problem) return answer;
-    err(problem);
+    err(errPaint('red', problem));
   }
 }
 
@@ -177,13 +183,15 @@ function planChanges(files, values) {
 
 function printSummary({ name, scope, owner, repo }, changes, skipInstall) {
   const commands = skipInstall ? 'none (--skip-install)' : PNPM_STEPS.map((s) => `pnpm ${s[0]}`).join(', ');
-  out('Template init summary');
-  out(`  Repository name: ${name}`);
-  out(`  npm scope:       ${scope}`);
-  out(`  GitHub repo:     ${owner}/${repo}`);
-  out(changes.length === 0 ? '  Files to rewrite (0): none' : `  Files to rewrite (${changes.length}):`);
-  for (const { file } of changes) out(`    ${file}`);
-  out(`  Commands to run: ${commands}`);
+  const row = (label, value) => out(`  ${paint('dim', label)} ${paint('cyan', value)}`);
+  heading('Template init summary');
+  row('Repository name:', name);
+  row('npm scope:      ', scope);
+  row('GitHub repo:    ', `${owner}/${repo}`);
+  out(paint('dim', changes.length === 0 ? '  Files to rewrite (0): none' : `  Files to rewrite (${changes.length}):`));
+  for (const { file } of changes) out(paint('dim', `    ${file}`));
+  row('Commands to run:', commands);
+  out('');
 }
 
 /** Exits 1 before any write when a listed file no longer matches the content the summary was built from. */
@@ -229,7 +237,7 @@ function applyChanges(changes) {
       process.exit(1);
     }
   }
-  out(`Rewrote ${changes.length} files.`);
+  out(paint('green', `Rewrote ${changes.length} files.`));
 }
 
 /** Runs the pnpm steps in order; on failure reports what remains and exits 1. */
@@ -238,16 +246,19 @@ function runPnpm() {
   process.on('SIGINT', () => {});
   for (const [index, args] of PNPM_STEPS.entries()) {
     const command = `pnpm ${args.join(' ')}`;
-    out(`Running: ${command}`);
-    const result = spawnSync('pnpm', args, {
+    heading(`Running: ${command}`);
+    const options = {
       cwd: REPO_ROOT,
       // On Windows pnpm is a .cmd launcher run through cmd.exe, which asks "Terminate batch job (Y/N)?" on Ctrl+C
       // when it reads the console. Without console input it exits at once, so one Ctrl+C reaches the failure report.
       stdio: [process.platform === 'win32' ? 'ignore' : 'inherit', 'inherit', 'inherit'],
-      shell: process.platform === 'win32',
-    });
+    };
+    // Windows needs a shell for the .cmd launcher. Pass one command string: shell mode with an args array is
+    // deprecated (DEP0190). The arguments are fixed constants, so nothing needs escaping.
+    const result =
+      process.platform === 'win32' ? spawnSync(command, { ...options, shell: true }) : spawnSync('pnpm', args, options);
     if (result.status !== 0) {
-      err(`Command failed: ${command}. If pnpm is not installed, install it first.`);
+      err(errPaint('red', `Command failed: ${command}. If pnpm is not installed, install it first.`));
       err('Rewritten files were kept. Steps still to run manually:');
       for (const rest of PNPM_STEPS.slice(index)) err(`  pnpm ${rest.join(' ')}`);
       process.exit(1);
@@ -263,9 +274,10 @@ function printCompletion({ name, scope }, skipInstall) {
     'Set up Migent: see README.md#set-up-migent.',
   ];
   if (skipInstall) steps.unshift('Run pnpm install && pnpm setup:git.');
-  out(`Initialized as ${name} (${scope}).`);
-  out('Remaining manual steps:');
-  for (const [index, step] of steps.entries()) out(`  ${index + 1}. ${step}`);
+  out('');
+  out(paint(['bold', 'green'], `Initialized as ${name} (${scope}).`));
+  heading('Remaining manual steps');
+  for (const [index, step] of steps.entries()) out(`  ${paint('yellow', `${index + 1}.`)} ${step}`);
 }
 
 async function main() {
@@ -301,7 +313,7 @@ async function main() {
         err('Confirmation required: re-run with --yes to apply these changes.');
         process.exit(2);
       }
-      const answer = (await ask(rl, 'Proceed? [Y/n] ')).toLowerCase();
+      const answer = (await ask(rl, `${paint('bold', 'Proceed?')} ${paint('dim', '[Y/n]')} `)).toLowerCase();
       if (answer !== '' && answer !== 'y' && answer !== 'yes') throw new Cancelled();
     }
     rl?.close();
